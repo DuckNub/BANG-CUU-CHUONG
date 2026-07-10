@@ -2,11 +2,10 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>Báo cáo tiến độ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#0a0c14;
@@ -23,7 +22,7 @@
     --warn:#ffc15e;
     --danger:#ff5c7a;
   }
-  *{box-sizing:border-box;}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;height:100%;}
   body{
     background:
@@ -38,7 +37,7 @@
   }
   .mono{font-family:'JetBrains Mono', monospace;}
 
-  .orb{position:fixed; border-radius:50%; filter:blur(70px); opacity:.35; pointer-events:none; z-index:0;}
+  .orb{position:fixed; border-radius:50%; filter:blur(70px); opacity:.32; pointer-events:none; z-index:0;}
   .orb1{width:420px;height:420px; background:var(--violet); top:-120px; left:-140px; animation:float1 22s ease-in-out infinite;}
   .orb2{width:360px;height:360px; background:var(--cyan); bottom:-140px; right:-100px; animation:float2 26s ease-in-out infinite;}
   .orb3{width:260px;height:260px; background:var(--pink); top:40%; right:10%; animation:float3 18s ease-in-out infinite;}
@@ -46,7 +45,7 @@
   @keyframes float2{0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-50px,-30px) scale(1.1);}}
   @keyframes float3{0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-30px,50px) scale(1.2);}}
 
-  #app{position:relative; z-index:1; max-width:640px; margin:0 auto; padding:24px 18px 60px;}
+  #app{position:relative; z-index:1; max-width:640px; margin:0 auto; padding:24px 18px 60px; width:100%;}
 
   .view{display:none;}
   .view.active{display:block; animation:viewIn .5s cubic-bezier(.2,.8,.2,1);}
@@ -81,7 +80,7 @@
     border-radius:12px;
     padding:12px 14px;
     font-family:inherit;
-    font-size:.95rem;
+    font-size:1rem;
     outline:none;
     transition:border-color .15s ease, box-shadow .15s ease;
   }
@@ -95,7 +94,7 @@
     display:inline-flex; align-items:center; justify-content:center; gap:8px;
     border-radius:12px; padding:12px 18px; font-weight:700; font-size:.92rem;
     cursor:pointer; border:1px solid transparent; transition:transform .12s ease, box-shadow .2s ease, opacity .15s ease;
-    user-select:none;
+    user-select:none; white-space:nowrap;
   }
   .btn:active{transform:translateY(1px) scale(.99);}
   .btn-primary{
@@ -132,23 +131,40 @@
   .navbox .ic{
     width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;
     background:linear-gradient(135deg, rgba(61,242,224,.16), rgba(181,123,255,.16));
-    border:1px solid var(--border); font-size:1.2rem;
+    border:1px solid var(--border); font-size:1.2rem; flex-shrink:0;
   }
   .navbox .label{font-weight:700; font-size:1.05rem;}
   .navbox .hint{color:var(--dim); font-size:.78rem;}
 
-  .topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;}
-  .userchip{display:flex; align-items:center; gap:8px; font-size:.78rem; color:var(--dim);}
+  .topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; gap:10px; flex-wrap:wrap;}
+  .userchip{display:flex; align-items:center; gap:8px; font-size:.78rem; color:var(--dim); flex-wrap:wrap;}
+  .userchip .mono{max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+  .addcat-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .addcat-row input#stats-new-name{flex:1 1 160px;}
+  .addcat-row input#stats-new-value{width:110px;}
 
   .catrow{display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06);}
   .catrow:last-child{border-bottom:none;}
   .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0; box-shadow:0 0 8px currentColor;}
-  .catname{flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .catval{width:78px; text-align:right; padding:6px 8px; border-radius:8px; font-size:.85rem;}
-  .catpct{width:56px; text-align:right; color:var(--dim); font-size:.82rem;}
-  .catdel{color:var(--danger); cursor:pointer; background:none; border:none; padding:4px; font-size:1rem;}
+  .catname{flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;}
+  .catval{width:78px; text-align:right; padding:6px 8px; border-radius:8px; font-size:.85rem; flex-shrink:0;}
+  .catpct{width:56px; text-align:right; color:var(--dim); font-size:.82rem; flex-shrink:0;}
+  .catdel{color:var(--danger); cursor:pointer; background:none; border:none; padding:4px; font-size:1rem; flex-shrink:0;}
 
-  .chartwrap{position:relative; height:280px;}
+  .chartwrap{position:relative; min-height:280px; display:flex; align-items:center; justify-content:center;}
+  .chart-container{width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;}
+  .chart-container svg{width:100%; max-width:260px; height:auto;}
+  .chart-legend{display:flex; flex-wrap:wrap; gap:8px 16px; justify-content:center;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--dim);}
+  .legend-item .dot{width:9px; height:9px;}
+
+  .barchart{width:100%; display:flex; flex-direction:column; gap:14px; padding:6px 4px;}
+  .barrow{display:flex; align-items:center; gap:10px;}
+  .barlabel{width:76px; flex-shrink:0; font-size:.82rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .bartrack{flex:1; height:14px; background:rgba(255,255,255,.06); border-radius:8px; overflow:hidden;}
+  .barfill{height:100%; border-radius:8px; transition:width .4s ease; min-width:2px;}
+  .barvalue{width:40px; text-align:right; font-size:.8rem; color:var(--dim); flex-shrink:0;}
 
   .chiptype{padding:8px 14px; border-radius:10px; font-size:.82rem; font-weight:700; cursor:pointer; border:1px solid var(--border); color:var(--dim); transition:all .15s ease;}
   .chiptype.active{background:linear-gradient(135deg, rgba(61,242,224,.2), rgba(181,123,255,.2)); color:var(--text); box-shadow:0 0 14px rgba(61,242,224,.2);}
@@ -171,6 +187,29 @@
   .empty{text-align:center; color:var(--dim); padding:30px 10px; font-size:.88rem;}
 
   ::selection{background:rgba(61,242,224,.3);}
+
+  @media (max-width:480px){
+    #app{padding:18px 12px 50px;}
+    .glass-pad{padding:15px;}
+    .neon-title{font-size:1.35rem !important;}
+    .navbox{padding:14px;}
+    .navbox .label{font-size:.98rem;}
+    .navbox .hint{font-size:.72rem;}
+    .userchip{width:100%; justify-content:space-between;}
+    .userchip .mono{max-width:140px;}
+    .addcat-row input#stats-new-name{flex-basis:100%;}
+    .addcat-row input#stats-new-value{flex:1 1 auto; width:auto;}
+    .addcat-row .btn{flex:1 1 auto;}
+    .catval{width:58px; padding:6px 6px; font-size:.8rem;}
+    .catpct{width:42px; font-size:.74rem;}
+    .catname{font-size:.92rem;}
+    .barlabel{width:58px; font-size:.76rem;}
+    .chiptype{padding:7px 10px; font-size:.76rem;}
+  }
+  @media (max-width:360px){
+    .catval{width:52px;}
+    .catpct{display:none;}
+  }
 </style>
 </head>
 <body>
@@ -244,9 +283,9 @@
     </div>
 
     <div class="glass navbox" id="nav-weekly">
-      <div style="display:flex; align-items:center; gap:12px;">
+      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
         <div class="ic">📊</div>
-        <div>
+        <div style="min-width:0;">
           <div class="label">Báo cáo tuần</div>
           <div class="hint">Mở bảng tính tuần</div>
         </div>
@@ -255,9 +294,9 @@
     </div>
 
     <div class="glass navbox" id="nav-detail">
-      <div style="display:flex; align-items:center; gap:12px;">
+      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
         <div class="ic">📄</div>
-        <div>
+        <div style="min-width:0;">
           <div class="label">Báo cáo chi tiết</div>
           <div class="hint">Mở bảng tính chi tiết</div>
         </div>
@@ -266,9 +305,9 @@
     </div>
 
     <div class="glass navbox" id="nav-stats">
-      <div style="display:flex; align-items:center; gap:12px;">
+      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
         <div class="ic">🥧</div>
-        <div>
+        <div style="min-width:0;">
           <div class="label">Thống kê</div>
           <div class="hint">Nhập số liệu và xem biểu đồ</div>
         </div>
@@ -288,9 +327,9 @@
 
     <div class="glass glass-pad" style="margin-bottom:14px;">
       <div class="sub" style="margin-bottom:10px;">Thêm mục</div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <input type="text" id="stats-new-name" placeholder="Tên mục, ví dụ: A" style="flex:1; min-width:120px;" />
-        <input type="number" id="stats-new-value" placeholder="Nhập số" class="mono" style="width:110px;" />
+      <div class="addcat-row">
+        <input type="text" id="stats-new-name" placeholder="Tên mục, ví dụ: A" />
+        <input type="number" id="stats-new-value" placeholder="Nhập số" class="mono" />
         <button class="btn btn-primary" id="btn-add-cat">+ Thêm</button>
       </div>
     </div>
@@ -305,7 +344,7 @@
 
     <div class="glass glass-pad" style="margin-bottom:14px;">
       <div class="sub" style="margin-bottom:10px;">Chọn loại biểu đồ</div>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <div class="chiptype active" data-type="doughnut">Vành khuyên</div>
         <div class="chiptype" data-type="pie">Tròn</div>
         <div class="chiptype" data-type="bar">Cột</div>
@@ -314,9 +353,9 @@
 
     <div class="glass glass-pad" style="margin-bottom:16px;">
       <div class="chartwrap" id="stats-chart-wrap">
-        <canvas id="stats-chart"></canvas>
+        <div id="stats-chart" class="chart-container"></div>
+        <div class="empty" id="stats-chart-empty">Thêm mục để xem biểu đồ</div>
       </div>
-      <div class="empty" id="stats-chart-empty">Thêm mục để xem biểu đồ</div>
     </div>
 
     <div style="display:flex; align-items:center; gap:12px;">
@@ -343,7 +382,7 @@
 
     <div class="glass glass-pad">
       <div class="chartwrap">
-        <canvas id="detail-chart"></canvas>
+        <div id="detail-chart" class="chart-container"></div>
       </div>
     </div>
   </div>
@@ -381,6 +420,7 @@ const WEEKLY_LINK = "https://docs.google.com/spreadsheets/d/17hTu5JoRbfCBwrwpIcF
 const DETAIL_LINK = "https://docs.google.com/spreadsheets/d/1s9SPQ8Ec1DTNSfDPQsFF5Cl1kIh4xU4q2z0DJWMwjOg/edit?usp=sharing";
 
 const PALETTE = ["#3df2e0","#b57bff","#ff4fa3","#ffc15e","#6ee7ff","#ff8a5c","#8effc1","#c58bff"];
+const SVG_NS = "http://www.w3.org/2000/svg";
 
 // ---------- state ----------
 let currentUser = null;
@@ -388,9 +428,6 @@ let categories = [];
 let chartType = "doughnut";
 let countdownTarget = null;
 let savedList = [];
-let selectedSavedId = null;
-let statsChart = null;
-let detailChart = null;
 let draftTimer = null;
 let authMode = "login";
 
@@ -430,6 +467,113 @@ function authErrorMessage(code){
     "auth/too-many-requests": "Thử lại quá nhiều lần, vui lòng chờ chút.",
   };
   return map[code] || "Có lỗi xảy ra, vui lòng thử lại.";
+}
+
+// ---------- custom SVG / bar chart renderer (no external library) ----------
+function clearChart(container){ container.innerHTML = ""; }
+
+function renderChartInto(container, emptyEl, labels, values, colors, type){
+  clearChart(container);
+  if(!values.length || values.reduce((a,b)=>a+b,0) <= 0){
+    container.style.display = "none";
+    if(emptyEl) emptyEl.style.display = "block";
+    return;
+  }
+  container.style.display = "flex";
+  if(emptyEl) emptyEl.style.display = "none";
+  if(type === "bar"){
+    renderBarChart(container, labels, values, colors);
+  }else{
+    renderPieChart(container, labels, values, colors, type === "donut" || type === "doughnut");
+  }
+}
+
+function renderPieChart(container, labels, values, colors, donut){
+  const total = values.reduce((a,b)=>a+b,0) || 1;
+  const size = 240, R = size/2, cx = R, cy = R;
+  const strokeWidth = donut ? R*0.42 : R;
+  const circleR = donut ? R - strokeWidth/2 : R/2;
+  const circumference = 2*Math.PI*circleR;
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+
+  const g = document.createElementNS(SVG_NS, "g");
+  g.setAttribute("transform", `rotate(-90 ${cx} ${cy})`);
+
+  let offsetAccum = 0;
+  values.forEach((v,i) => {
+    const frac = v/total;
+    const dash = frac * circumference;
+    const gap = circumference - dash;
+    const circle = document.createElementNS(SVG_NS, "circle");
+    circle.setAttribute("cx", cx);
+    circle.setAttribute("cy", cy);
+    circle.setAttribute("r", circleR);
+    circle.setAttribute("fill", "none");
+    circle.setAttribute("stroke", colors[i % colors.length]);
+    circle.setAttribute("stroke-width", strokeWidth);
+    circle.setAttribute("stroke-dasharray", `${dash} ${gap}`);
+    circle.setAttribute("stroke-dashoffset", String(-offsetAccum));
+    circle.style.filter = `drop-shadow(0 0 5px ${colors[i % colors.length]}88)`;
+    g.appendChild(circle);
+    offsetAccum += dash;
+  });
+  svg.appendChild(g);
+  container.appendChild(svg);
+
+  const legend = document.createElement("div");
+  legend.className = "chart-legend";
+  labels.forEach((l,i) => {
+    const item = document.createElement("div");
+    item.className = "legend-item";
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.style.background = colors[i % colors.length];
+    dot.style.color = colors[i % colors.length];
+    const txt = document.createElement("span");
+    const pct = (values[i]/total*100).toFixed(1);
+    txt.textContent = `${l} · ${pct}%`;
+    item.appendChild(dot);
+    item.appendChild(txt);
+    legend.appendChild(item);
+  });
+  container.appendChild(legend);
+}
+
+function renderBarChart(container, labels, values, colors){
+  const max = Math.max(...values, 1);
+  const wrap = document.createElement("div");
+  wrap.className = "barchart";
+  labels.forEach((l,i) => {
+    const row = document.createElement("div");
+    row.className = "barrow";
+
+    const label = document.createElement("div");
+    label.className = "barlabel";
+    label.textContent = l;
+    label.title = l;
+
+    const track = document.createElement("div");
+    track.className = "bartrack";
+    const fill = document.createElement("div");
+    fill.className = "barfill";
+    const pct = (values[i]/max*100);
+    fill.style.width = pct + "%";
+    fill.style.background = colors[i % colors.length];
+    fill.style.boxShadow = `0 0 10px ${colors[i % colors.length]}88`;
+    track.appendChild(fill);
+
+    const val = document.createElement("div");
+    val.className = "barvalue mono";
+    val.textContent = values[i];
+
+    row.appendChild(label);
+    row.appendChild(track);
+    row.appendChild(val);
+    wrap.appendChild(row);
+  });
+  container.appendChild(wrap);
 }
 
 // ---------- auth ----------
@@ -591,6 +735,7 @@ function renderCategoryList(){
     const name = document.createElement("div");
     name.className = "catname";
     name.textContent = c.name;
+    name.title = c.name;
 
     const valInput = document.createElement("input");
     valInput.type = "number";
@@ -651,6 +796,8 @@ $("btn-add-cat").addEventListener("click", () => {
   renderChart();
   scheduleSaveDraft();
 });
+$("stats-new-value").addEventListener("keydown", (e) => { if(e.key === "Enter") $("btn-add-cat").click(); });
+$("stats-new-name").addEventListener("keydown", (e) => { if(e.key === "Enter") $("stats-new-value").focus(); });
 
 document.querySelectorAll(".chiptype").forEach(chip => {
   chip.addEventListener("click", () => {
@@ -667,64 +814,12 @@ function updateChartTypeUI(){
 }
 
 function renderChart(){
-  const canvas = $("stats-chart");
+  const container = $("stats-chart");
   const empty = $("stats-chart-empty");
-  if(categories.length === 0){
-    canvas.style.display = "none";
-    empty.style.display = "block";
-    if(statsChart){ statsChart.destroy(); statsChart = null; }
-    return;
-  }
-  canvas.style.display = "block";
-  empty.style.display = "none";
   const labels = categories.map(c => c.name);
   const values = categories.map(c => Number(c.value)||0);
   const colors = categories.map((c,i) => PALETTE[i % PALETTE.length]);
-  buildChart(canvas, "stats", labels, values, colors, chartType);
-}
-
-let chartInstances = {};
-function buildChart(canvas, key, labels, values, colors, type){
-  if(chartInstances[key]){ chartInstances[key].destroy(); }
-  const ctx = canvas.getContext("2d");
-  const cfg = {
-    type: type === "bar" ? "bar" : type,
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        backgroundColor: colors,
-        borderColor: type === "bar" ? colors : "rgba(10,12,20,0.6)",
-        borderWidth: type === "bar" ? 0 : 2,
-        borderRadius: type === "bar" ? 8 : 0,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: type !== "bar",
-          position: "bottom",
-          labels: { color: "#e9edfb", font: { family: "'Be Vietnam Pro'" }, padding: 14 }
-        },
-        tooltip: {
-          backgroundColor: "rgba(15,18,32,.95)",
-          borderColor: "rgba(150,180,255,.3)",
-          borderWidth: 1,
-          titleColor: "#e9edfb",
-          bodyColor: "#e9edfb",
-        }
-      },
-      scales: type === "bar" ? {
-        x: { ticks: { color: "#8a92b8" }, grid: { color: "rgba(255,255,255,.05)" } },
-        y: { ticks: { color: "#8a92b8" }, grid: { color: "rgba(255,255,255,.06)" } }
-      } : {}
-    }
-  };
-  chartInstances[key] = new Chart(ctx, cfg);
-  if(key === "stats") statsChart = chartInstances[key];
-  if(key === "detail") detailChart = chartInstances[key];
+  renderChartInto(container, empty, labels, values, colors, chartType);
 }
 
 // ---------- save snapshot ----------
@@ -774,7 +869,10 @@ function renderSavedList(){
   const container = $("saved-list-container");
   container.innerHTML = "";
   if(savedList.length === 0){
-    container.innerHTML = '<div class="glass empty">Chưa có bản lưu nào</div>';
+    const empty = document.createElement("div");
+    empty.className = "glass empty";
+    empty.textContent = "Chưa có bản lưu nào";
+    container.appendChild(empty);
     return;
   }
   savedList.forEach(s => {
@@ -784,8 +882,12 @@ function renderSavedList(){
     const left = document.createElement("div");
     left.style.flex = "1";
     left.style.cursor = "pointer";
+    left.style.minWidth = "0";
     const title = document.createElement("div");
     title.style.fontWeight = "700";
+    title.style.overflow = "hidden";
+    title.style.textOverflow = "ellipsis";
+    title.style.whiteSpace = "nowrap";
     title.textContent = s.label;
     const meta = document.createElement("div");
     meta.className = "mono";
@@ -815,7 +917,6 @@ function renderSavedList(){
 }
 
 function openSavedDetail(s){
-  selectedSavedId = s.id;
   showView("view-saved-detail");
   $("detail-label").textContent = s.label;
   $("detail-meta").textContent = `Tổng: ${s.total} · ${s.categories.length} mục`;
@@ -832,10 +933,12 @@ function openSavedDetail(s){
     const name = document.createElement("div");
     name.className = "catname";
     name.textContent = c.name;
+    name.title = c.name;
     const val = document.createElement("div");
     val.className = "mono";
     val.style.width = "60px";
     val.style.textAlign = "right";
+    val.style.flexShrink = "0";
     val.textContent = c.value;
     const pct = document.createElement("div");
     pct.className = "catpct mono";
@@ -848,10 +951,11 @@ function openSavedDetail(s){
     listEl.appendChild(row);
   });
 
+  const container = $("detail-chart");
   const labels = s.categories.map(c => c.name);
   const values = s.categories.map(c => Number(c.value)||0);
   const colors = s.categories.map((c,i) => PALETTE[i % PALETTE.length]);
-  buildChart($("detail-chart"), "detail", labels, values, colors, s.chartType || "doughnut");
+  renderChartInto(container, null, labels, values, colors, s.chartType || "doughnut");
 }
 </script>
 </body>
