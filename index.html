@@ -186,6 +186,13 @@
 
   .empty{text-align:center; color:var(--dim); padding:30px 10px; font-size:.88rem;}
 
+  /* ---- workout (tap luyen) ---- */
+  .workout-status{text-align:center; margin-bottom:6px; font-weight:700;}
+  .workout-timer{font-size:3rem; font-weight:800; text-align:center; margin:6px 0 18px; letter-spacing:.02em;}
+  .workout-bigbtn{padding:22px 18px; font-size:1.05rem; border-radius:18px;}
+  .setrow{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); font-size:.85rem;}
+  .setrow:last-child{border-bottom:none;}
+
   ::selection{background:rgba(61,242,224,.3);}
 
   @media (max-width:480px){
@@ -205,6 +212,7 @@
     .catname{font-size:.92rem;}
     .barlabel{width:58px; font-size:.76rem;}
     .chiptype{padding:7px 10px; font-size:.76rem;}
+    .workout-timer{font-size:2.4rem;}
   }
   @media (max-width:360px){
     .catval{width:52px;}
@@ -314,6 +322,17 @@
       </div>
       <div>›</div>
     </div>
+
+    <div class="glass navbox" id="nav-workout">
+      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+        <div class="ic">💪</div>
+        <div style="min-width:0;">
+          <div class="label">Tập luyện</div>
+          <div class="hint">Đo thời gian set / nghỉ</div>
+        </div>
+      </div>
+      <div>›</div>
+    </div>
   </div>
 
   <!-- STATS VIEW -->
@@ -387,6 +406,53 @@
     </div>
   </div>
 
+  <!-- WORKOUT VIEW -->
+  <div class="view" id="view-workout">
+    <div class="topbar">
+      <button class="btn btn-ghost btn-sm" id="btn-workout-back">← Trang chính</button>
+      <button class="btn btn-ghost btn-sm" id="btn-workout-open-saved">🗂 Bản lưu</button>
+    </div>
+    <h2 class="neon-title" style="font-size:1.6rem; margin-bottom:16px;">TẬP LUYỆN</h2>
+
+    <div class="glass glass-pad" style="margin-bottom:14px; text-align:center;">
+      <div class="sub workout-status" id="workout-status">Sẵn sàng</div>
+      <div class="mono workout-timer" id="workout-timer">00:00:00</div>
+      <button class="btn btn-primary btn-block workout-bigbtn" id="btn-workout-main">Bắt đầu Set 1</button>
+      <div style="margin-top:10px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" id="btn-workout-pause">⏸ Tạm dừng</button>
+        <button class="btn btn-ghost btn-sm" id="btn-workout-finish">✅ Hoàn thành bài tập</button>
+        <button class="btn btn-ghost btn-sm" id="btn-workout-reset">↺ Làm lại</button>
+      </div>
+    </div>
+
+    <div class="glass glass-pad" style="margin-bottom:14px; display:none;" id="workout-sets-card">
+      <div class="sub" style="margin-bottom:8px;">Các set</div>
+      <div id="workout-sets-list"></div>
+    </div>
+
+    <div class="glass glass-pad" id="workout-save-card" style="display:none;">
+      <div class="field" style="margin-bottom:10px;">
+        <label>Tên bài tập</label>
+        <input type="text" id="workout-name" placeholder="ví dụ: Đẩy ngực" />
+      </div>
+      <button class="btn btn-primary btn-block" id="btn-workout-save">💾 Lưu buổi tập</button>
+    </div>
+  </div>
+
+  <!-- WORKOUT SAVED LIST (BY DAY) -->
+  <div class="view" id="view-workout-saved-list">
+    <button class="btn btn-ghost btn-sm" id="btn-workout-savedlist-back" style="margin-bottom:16px;">← Tập luyện</button>
+    <h2 class="neon-title" style="font-size:1.5rem; margin-bottom:16px;">Bản lưu theo ngày</h2>
+    <div id="workout-day-list-container"></div>
+  </div>
+
+  <!-- WORKOUT DAY DETAIL -->
+  <div class="view" id="view-workout-day-detail">
+    <button class="btn btn-ghost btn-sm" id="btn-workout-daydetail-back" style="margin-bottom:16px;">← Bản lưu</button>
+    <h2 class="neon-title" style="font-size:1.4rem;" id="workout-day-label"></h2>
+    <div id="workout-day-sessions"></div>
+  </div>
+
 </div>
 
 <div class="toast" id="toast">Đã lưu</div>
@@ -430,6 +496,16 @@ let countdownTarget = null;
 let savedList = [];
 let draftTimer = null;
 let authMode = "login";
+
+// ---------- workout state ----------
+let workoutState = "idle"; // idle | set | rest
+let workoutPaused = false;
+let workoutPhaseStartTs = null; // Date.now() when current running phase segment began
+let workoutPhaseAccumMs = 0;    // ms accumulated for current phase across pauses
+let workoutTimerInterval = null;
+let workoutPendingSet = null;
+let workoutSets = [];
+let workoutSavedDocs = [];
 
 // ---------- helpers ----------
 function $(id){ return document.getElementById(id); }
@@ -630,6 +706,7 @@ onAuthStateChanged(auth, async (user) => {
     categories = [];
     countdownTarget = null;
     savedList = [];
+    resetWorkoutSession();
     showView("view-auth");
   }
 });
@@ -956,6 +1033,312 @@ function openSavedDetail(s){
   const values = s.categories.map(c => Number(c.value)||0);
   const colors = s.categories.map((c,i) => PALETTE[i % PALETTE.length]);
   renderChartInto(container, null, labels, values, colors, s.chartType || "doughnut");
+}
+
+// ==================== WORKOUT (TẬP LUYỆN) ====================
+// Formats a duration in milliseconds as MM:SS:CS (minutes:seconds:centiseconds)
+function formatClock(totalMs){
+  totalMs = Math.max(0, Math.round(totalMs));
+  const cs = Math.floor((totalMs % 1000) / 10);
+  const totalSec = Math.floor(totalMs / 1000);
+  const mm = Math.floor(totalSec / 60);
+  const ss = totalSec % 60;
+  return `${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}:${String(cs).padStart(2,"0")}`;
+}
+
+function currentPhaseMs(){
+  if(workoutPhaseStartTs === null) return workoutPhaseAccumMs;
+  return workoutPhaseAccumMs + (Date.now() - workoutPhaseStartTs);
+}
+
+function tickWorkout(){
+  $("workout-timer").textContent = formatClock(currentPhaseMs());
+}
+function startWorkoutInterval(){
+  workoutPhaseStartTs = Date.now();
+  if(workoutTimerInterval) clearInterval(workoutTimerInterval);
+  workoutTimerInterval = setInterval(tickWorkout, 30);
+}
+function stopWorkoutInterval(){
+  if(workoutTimerInterval){ clearInterval(workoutTimerInterval); workoutTimerInterval = null; }
+}
+
+function updateWorkoutUI(){
+  const statusEl = $("workout-status");
+  const btn = $("btn-workout-main");
+  const pauseBtn = $("btn-workout-pause");
+  const finishBtn = $("btn-workout-finish");
+  if(workoutState === "idle"){
+    statusEl.textContent = "Sẵn sàng";
+    statusEl.style.color = "var(--dim)";
+    btn.textContent = workoutSets.length ? `Bắt đầu Set ${workoutSets.length+1}` : "Bắt đầu Set 1";
+    pauseBtn.disabled = true;
+    finishBtn.disabled = true;
+  }else if(workoutState === "set"){
+    statusEl.textContent = `⏱ SET ${workoutSets.length+1}`;
+    statusEl.style.color = "var(--cyan)";
+    btn.textContent = "Kết thúc Set → Nghỉ";
+    pauseBtn.disabled = false;
+    finishBtn.disabled = false;
+  }else if(workoutState === "rest"){
+    statusEl.textContent = "😮‍💨 NGHỈ";
+    statusEl.style.color = "var(--violet)";
+    btn.textContent = "Kết thúc nghỉ → Set tiếp";
+    pauseBtn.disabled = false;
+    finishBtn.disabled = false;
+  }
+  pauseBtn.textContent = workoutPaused ? "▶ Tiếp tục" : "⏸ Tạm dừng";
+  btn.disabled = workoutPaused;
+}
+
+function renderWorkoutSets(){
+  const card = $("workout-sets-card");
+  const list = $("workout-sets-list");
+  const saveCard = $("workout-save-card");
+  list.innerHTML = "";
+  if(workoutSets.length === 0){
+    card.style.display = "none";
+    saveCard.style.display = "none";
+    return;
+  }
+  card.style.display = "block";
+  saveCard.style.display = "block";
+  workoutSets.forEach((s,i) => {
+    const row = document.createElement("div");
+    row.className = "setrow mono";
+    row.innerHTML = `<span>Set ${i+1}</span><span>${formatClock(s.set)} — Nghỉ: ${formatClock(s.rest)}</span>`;
+    list.appendChild(row);
+  });
+}
+
+function resetWorkoutSession(){
+  stopWorkoutInterval();
+  workoutState = "idle";
+  workoutPaused = false;
+  workoutPhaseStartTs = null;
+  workoutPhaseAccumMs = 0;
+  workoutPendingSet = null;
+  workoutSets = [];
+  if($("workout-timer")) $("workout-timer").textContent = "00:00:00";
+  if($("workout-name")) $("workout-name").value = "";
+  renderWorkoutSets();
+  updateWorkoutUI();
+}
+
+$("nav-workout").addEventListener("click", () => {
+  showView("view-workout");
+  updateWorkoutUI();
+});
+$("btn-workout-back").addEventListener("click", () => showView("view-home"));
+
+$("btn-workout-main").addEventListener("click", () => {
+  if(workoutPaused) return;
+  if(workoutState === "idle"){
+    workoutState = "set";
+    workoutPhaseAccumMs = 0;
+    workoutPendingSet = {};
+    startWorkoutInterval();
+  }else if(workoutState === "set"){
+    workoutPendingSet.set = currentPhaseMs();
+    workoutState = "rest";
+    workoutPhaseAccumMs = 0;
+    startWorkoutInterval();
+  }else if(workoutState === "rest"){
+    workoutPendingSet.rest = currentPhaseMs();
+    workoutSets.push(workoutPendingSet);
+    workoutPendingSet = {};
+    renderWorkoutSets();
+    workoutState = "set";
+    workoutPhaseAccumMs = 0;
+    startWorkoutInterval();
+  }
+  $("workout-timer").textContent = formatClock(currentPhaseMs());
+  updateWorkoutUI();
+});
+
+$("btn-workout-pause").addEventListener("click", () => {
+  if(workoutState === "idle") return;
+  if(!workoutPaused){
+    // pausing: freeze accumulated time
+    workoutPhaseAccumMs = currentPhaseMs();
+    workoutPhaseStartTs = null;
+    stopWorkoutInterval();
+    workoutPaused = true;
+  }else{
+    // resuming
+    workoutPaused = false;
+    startWorkoutInterval();
+  }
+  updateWorkoutUI();
+});
+
+$("btn-workout-reset").addEventListener("click", () => {
+  resetWorkoutSession();
+});
+
+$("btn-workout-finish").addEventListener("click", () => {
+  if(workoutState === "idle") return;
+  const elapsed = currentPhaseMs();
+  if(workoutState === "set"){
+    // finishing mid-set: record it, no rest tracked for this final set
+    workoutPendingSet = workoutPendingSet || {};
+    workoutPendingSet.set = elapsed;
+    workoutPendingSet.rest = 0;
+    workoutSets.push(workoutPendingSet);
+  }else if(workoutState === "rest"){
+    // finishing during rest: record rest for the last completed set
+    workoutPendingSet = workoutPendingSet || {};
+    workoutPendingSet.rest = elapsed;
+    workoutSets.push(workoutPendingSet);
+  }
+  workoutPendingSet = null;
+  stopWorkoutInterval();
+  workoutState = "idle";
+  workoutPaused = false;
+  workoutPhaseStartTs = null;
+  workoutPhaseAccumMs = 0;
+  $("workout-timer").textContent = "00:00:00";
+  renderWorkoutSets();
+  updateWorkoutUI();
+  showToast("Đã ghi nhận set cuối");
+});
+
+$("btn-workout-save").addEventListener("click", async () => {
+  const name = $("workout-name").value.trim();
+  if(!name || workoutSets.length === 0 || !currentUser) return;
+  const now = new Date();
+  const session = {
+    name,
+    date: fmtDateVN(now),
+    createdAt: now.getTime(),
+    time: now.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}),
+    sets: workoutSets.map(s => ({ set: s.set||0, rest: s.rest||0 })),
+  };
+  try{
+    const coll = collection(db, "users", currentUser.uid, "workouts");
+    await addDoc(coll, session);
+    showToast("Đã lưu buổi tập");
+    resetWorkoutSession();
+  }catch(e){
+    console.error("Workout save error:", e);
+    showToast("Lưu thất bại: " + (e.code || e.message || "không rõ lỗi"));
+  }
+});
+
+$("btn-workout-open-saved").addEventListener("click", async () => {
+  showView("view-workout-saved-list");
+  await loadWorkoutDayList();
+});
+$("btn-workout-savedlist-back").addEventListener("click", () => showView("view-workout"));
+$("btn-workout-daydetail-back").addEventListener("click", () => showView("view-workout-saved-list"));
+
+async function loadWorkoutDayList(){
+  const container = $("workout-day-list-container");
+  container.innerHTML = '<div class="spinner"></div>';
+  try{
+    const coll = collection(db, "users", currentUser.uid, "workouts");
+    const q = query(coll, orderBy("createdAt", "desc"));
+    const snaps = await getDocs(q);
+    workoutSavedDocs = [];
+    snaps.forEach(d => workoutSavedDocs.push({ id: d.id, ...d.data() }));
+  }catch(e){
+    console.error("Workout list load error:", e);
+    workoutSavedDocs = [];
+  }
+  renderWorkoutDayList();
+}
+
+function renderWorkoutDayList(){
+  const container = $("workout-day-list-container");
+  container.innerHTML = "";
+  if(workoutSavedDocs.length === 0){
+    const empty = document.createElement("div");
+    empty.className = "glass empty";
+    empty.textContent = "Chưa có buổi tập nào được lưu";
+    container.appendChild(empty);
+    return;
+  }
+  const groups = {};
+  const order = [];
+  workoutSavedDocs.forEach(s => {
+    if(!groups[s.date]){ groups[s.date] = []; order.push(s.date); }
+    groups[s.date].push(s);
+  });
+  order.forEach(dateStr => {
+    const sessions = groups[dateStr];
+    const card = document.createElement("div");
+    card.className = "glass savecard";
+    const left = document.createElement("div");
+    left.style.flex = "1";
+    left.style.minWidth = "0";
+    const title = document.createElement("div");
+    title.style.fontWeight = "700";
+    title.textContent = dateStr;
+    const meta = document.createElement("div");
+    meta.className = "mono";
+    meta.style.color = "var(--dim)";
+    meta.style.fontSize = ".78rem";
+    meta.textContent = `${sessions.length} buổi tập`;
+    left.appendChild(title);
+    left.appendChild(meta);
+    card.appendChild(left);
+    card.appendChild(document.createTextNode("›"));
+    card.addEventListener("click", () => openWorkoutDayDetail(dateStr, sessions));
+    container.appendChild(card);
+  });
+}
+
+function openWorkoutDayDetail(dateStr, sessions){
+  showView("view-workout-day-detail");
+  $("workout-day-label").textContent = dateStr;
+  const container = $("workout-day-sessions");
+  container.innerHTML = "";
+  sessions.forEach(s => {
+    const card = document.createElement("div");
+    card.className = "glass";
+    card.style.marginBottom = "12px";
+    card.style.overflow = "hidden";
+
+    const totalSets = s.sets.length;
+    const avgSet = totalSets ? (s.sets.reduce((a,c)=>a+c.set,0)/totalSets) : 0;
+    const avgRest = totalSets ? (s.sets.reduce((a,c)=>a+c.rest,0)/totalSets) : 0;
+    const setsHtml = s.sets.map((st,i) => `<div class="setrow mono"><span>Set ${i+1}</span><span>${formatClock(st.set)} — Nghỉ: ${formatClock(st.rest)}</span></div>`).join("");
+
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+    header.style.gap = "10px";
+    header.style.padding = "14px 16px";
+    header.style.cursor = "pointer";
+    header.innerHTML = `
+      <div style="min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700;">${s.name}</div>
+      <button class="btn btn-ghost btn-sm workout-detail-toggle" type="button">Chi tiết ▾</button>
+      <div class="mono sub" style="text-transform:none; flex-shrink:0;">${s.time||""}</div>
+    `;
+
+    const body = document.createElement("div");
+    body.style.display = "none";
+    body.style.padding = "0 16px 16px";
+    body.innerHTML = `
+      <div style="border-top:1px solid rgba(255,255,255,.06); padding-top:10px;">${setsHtml}</div>
+      <div class="mono" style="margin-top:10px; font-size:.8rem; color:var(--dim); display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+        <span>Tổng set: ${totalSets}</span><span>TB/set: ${formatClock(avgSet)}</span><span>TB/nghỉ: ${formatClock(avgRest)}</span>
+      </div>
+    `;
+
+    const toggleBtn = header.querySelector(".workout-detail-toggle");
+    function toggle(){
+      const open = body.style.display !== "none";
+      body.style.display = open ? "none" : "block";
+      toggleBtn.textContent = open ? "Chi tiết ▾" : "Thu gọn ▴";
+    }
+    header.addEventListener("click", toggle);
+
+    card.appendChild(header);
+    card.appendChild(body);
+    container.appendChild(card);
+  });
 }
 </script>
 </body>
